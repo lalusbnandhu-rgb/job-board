@@ -1,0 +1,24 @@
+{
+  "name": "job-board",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose up",
+    "dev:build": "docker compose up --build",
+    "dev:fresh": "docker compose down -v && docker compose up --build",
+    "down": "docker compose down",
+    "down:volumes": "docker compose down -v",
+    "logs": "docker compose logs -f",
+    "logs:backend": "docker compose logs -f backend",
+    "logs:frontend": "docker compose logs -f frontend",
+    "install:all": "pnpm install --recursive",
+    "test:integration": "pnpm --filter job-board-backend test:integration",
+    "test:e2e": "pnpm --filter job-board-e2e test",
+    "test:e2e:headed": "pnpm --filter job-board-e2e test:headed",
+    "playwright:install": "pnpm --filter job-board-e2e setup"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
