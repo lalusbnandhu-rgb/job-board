@@ -2,11 +2,15 @@
  * Integration tests — /api/employer
  */
 
-jest.mock('../../utils/email', () => ({
-  sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
-  sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
-  sendApplicationStatusEmail: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('../../utils/email', () => {
+  const actual = jest.requireActual('../../utils/email');
+  return {
+    ...actual,
+    sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+    sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    sendApplicationStatusEmail: jest.fn().mockResolvedValue(undefined),
+  };
+});
 jest.mock('../../utils/cloudinary-upload', () => ({
   uploadToCloudinary: jest.fn().mockResolvedValue('https://example.com/logo.jpg'),
 }));
@@ -224,8 +228,8 @@ describe('PATCH /api/employer/applications/:applicationId/status', () => {
 
     expect(res.status).toBe(200);
 
-    // Allow fire-and-forget email microtask to flush
-    await Promise.resolve().then(() => Promise.resolve());
+    // Allow fire-and-forget DB + email chain to complete
+    await new Promise((r) => setTimeout(r, 200));
 
     expect(mockSendEmail).toHaveBeenCalledWith(
       seeker.email,

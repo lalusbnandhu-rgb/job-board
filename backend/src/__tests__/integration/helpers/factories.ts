@@ -94,6 +94,7 @@ export async function createEmployerWithCompany(
 }
 
 interface SeekerContext extends AuthTokens {
+  email: string;
   profileId?: string;
 }
 
@@ -113,7 +114,7 @@ export async function createSeekerWithProfile(
     resumeUrl: 'https://example.com/resume.pdf',
   });
   const tokens = await loginAs(email, password);
-  return { ...tokens, profileId: profile._id.toString() };
+  return { ...tokens, email, profileId: profile._id.toString() };
 }
 
 interface JobContext {
