@@ -68,7 +68,7 @@ describe('authService.register', () => {
       'new@example.com',
       expect.any(String),
     );
-    expect(result.message).toMatch(/verify your email/i);
+    expect(result.message).toMatch(/check your email/i);
   });
 
   it('throws 409 if email is already registered', async () => {

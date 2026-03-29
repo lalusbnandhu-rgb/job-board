@@ -4,7 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "docker compose up",
+    "dev:frontend": "pnpm --filter job-board-frontend dev",
+    "dev:backend": "pnpm --filter job-board-backend dev",
     "dev:build": "docker compose up --build",
+    "docker:start": "start \"\" \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\"",
+    "start": "docker compose up --build -d",
     "dev:fresh": "docker compose down -v && docker compose up --build",
     "down": "docker compose down",
     "down:volumes": "docker compose down -v",

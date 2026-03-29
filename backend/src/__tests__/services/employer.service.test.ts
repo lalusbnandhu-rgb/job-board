@@ -14,14 +14,29 @@ process.env.CLIENT_URL = 'http://localhost:3000';
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 jest.mock('../../models/company.model');
 jest.mock('../../models/job.model');
-jest.mock('../../models/application.model');
+jest.mock('../../models/application.model', () => {
+  const actual = jest.requireActual('../../models/application.model');
+  return {
+    APPLICATION_STATUSES: actual.APPLICATION_STATUSES,
+    Application: {
+      aggregate: jest.fn(),
+      find: jest.fn(),
+      countDocuments: jest.fn(),
+      findById: jest.fn(),
+      findByIdAndUpdate: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+});
 jest.mock('../../models/seeker-profile.model');
+jest.mock('../../models/user.model');
 jest.mock('../../utils/cloudinary-upload');
 
 import { Company } from '../../models/company.model';
 import { Job } from '../../models/job.model';
 import { Application } from '../../models/application.model';
 import { SeekerProfile } from '../../models/seeker-profile.model';
+import { User } from '../../models/user.model';
 import * as cloudinary from '../../utils/cloudinary-upload';
 import * as employerService from '../../services/employer.service';
 
@@ -29,6 +44,7 @@ const MockCompany = Company as jest.Mocked<typeof Company>;
 const MockJob = Job as jest.Mocked<typeof Job>;
 const MockApplication = Application as jest.Mocked<typeof Application>;
 const MockSeekerProfile = SeekerProfile as jest.Mocked<typeof SeekerProfile>;
+const MockUser = User as jest.Mocked<typeof User>;
 const mockCloudinary = cloudinary as jest.Mocked<typeof cloudinary>;
 
 afterEach(() => jest.clearAllMocks());
@@ -218,17 +234,22 @@ describe('employerService.updateApplicationStatus', () => {
   it('updates status and note when authorized', async () => {
     (MockApplication.findById as jest.Mock).mockReturnValue({
       select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ jobId: 'job-id', status: 'applied' }),
+        lean: jest.fn().mockResolvedValue({ jobId: 'job-id', status: 'applied', seekerId: { toString: () => 'seeker-id' } }),
       }),
     });
     (MockJob.findById as jest.Mock).mockReturnValue({
       select: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           postedBy: { toString: () => 'employer-id' },
+          title: 'Dev Job',
         }),
       }),
     });
     (MockApplication.findByIdAndUpdate as jest.Mock).mockResolvedValue(undefined);
+    // Mock fire-and-forget email dependencies so .select() calls don't throw
+    (MockSeekerProfile.findOne as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+    });
 
     await expect(
       employerService.updateApplicationStatus('app-id', 'employer-id', 'shortlisted', 'Great candidate'),
