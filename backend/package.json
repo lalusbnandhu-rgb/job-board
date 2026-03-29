@@ -20,6 +20,7 @@
     "express": "^4.21.0",
     "express-async-errors": "^3.1.1",
     "express-rate-limit": "^7.4.0",
+    "handlebars": "^4.7.9",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^8.8.0",

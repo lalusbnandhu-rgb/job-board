@@ -6,7 +6,7 @@ import { User } from '../models/user.model';
 import { ApiError } from '../utils/errors';
 import { uploadBuffer, deleteFile } from '../utils/cloudinary-upload';
 import { parsePagination, buildPaginationMeta, type PaginationMeta } from '../utils/pagination';
-import { sendApplicationStatusEmail } from '../utils/email';
+import { sendApplicationStatusEmail, isNotifiableStatus } from '../utils/email';
 
 // ── Input types ───────────────────────────────────────────────────────────────
 
@@ -189,31 +189,32 @@ export const updateApplicationStatus = async (
     throw new ApiError(403, 'You can only update applications for your own jobs');
   }
 
-  const update: Record<string, unknown> = { status };
-  if (employerNote !== undefined) update.employerNote = employerNote;
+  const update: Record<string, unknown> = { status, employerNote: employerNote ?? null };
 
   await Application.findByIdAndUpdate(applicationId, update);
 
-  // Send email notification to seeker (fire-and-forget — never block the response)
-  const seekerId = application.seekerId.toString();
-  Promise.all([
-    User.findById(seekerId).select('email').lean(),
-    SeekerProfile.findOne({ userId: seekerId }).select('firstName lastName').lean(),
-  ])
-    .then(([user, profile]) => {
-      if (!user) return;
-      const seekerName = profile
-        ? `${profile.firstName} ${profile.lastName}`.trim()
-        : user.email;
-      return sendApplicationStatusEmail(
-        user.email,
-        seekerName,
-        job.title,
-        status,
-        employerNote,
-      );
-    })
-    .catch((err: unknown) => {
-      console.error('[email] Failed to send application status email:', err);
-    });
+  // Send email notification to seeker for actionable statuses (fire-and-forget)
+  if (isNotifiableStatus(status)) {
+    const seekerId = application.seekerId.toString();
+    Promise.all([
+      User.findById(seekerId).select('email').lean(),
+      SeekerProfile.findOne({ userId: seekerId }).select('firstName lastName').lean(),
+    ])
+      .then(([user, profile]) => {
+        if (!user) return;
+        const seekerName = profile
+          ? `${profile.firstName} ${profile.lastName}`.trim()
+          : user.email;
+        return sendApplicationStatusEmail(
+          user.email,
+          seekerName,
+          job.title,
+          status,
+          employerNote,
+        );
+      })
+      .catch((err: unknown) => {
+        console.error('[email] Failed to send application status email:', err);
+      });
+  }
 };

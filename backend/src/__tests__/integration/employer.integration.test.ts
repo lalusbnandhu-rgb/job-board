@@ -5,6 +5,7 @@
 jest.mock('../../utils/email', () => ({
   sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
   sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+  sendApplicationStatusEmail: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../utils/cloudinary-upload', () => ({
   uploadToCloudinary: jest.fn().mockResolvedValue('https://example.com/logo.jpg'),
@@ -19,6 +20,7 @@ import {
   createJob,
   JOB_BODY,
 } from './helpers/factories';
+import * as emailUtil from '../../utils/email';
 
 beforeAll(() => connectTestDB());
 afterAll(() => disconnectTestDB());
@@ -196,5 +198,41 @@ describe('PATCH /api/employer/applications/:applicationId/status', () => {
       .set('Authorization', `Bearer ${emp.accessToken}`)
       .send({ status: 'hired' }); // not a valid status
     expect(res.status).toBe(400);
+  });
+
+  it('triggers sendApplicationStatusEmail after a status update', async () => {
+    const mockSendEmail = emailUtil.sendApplicationStatusEmail as jest.Mock;
+    mockSendEmail.mockClear();
+
+    const emp = await createEmployerWithCompany();
+    const { jobId } = await createJob(emp.accessToken);
+    const seeker = await createSeekerWithProfile();
+
+    const applyRes = await request(app)
+      .post('/api/applications')
+      .set('Authorization', `Bearer ${seeker.accessToken}`)
+      .send({
+        jobId,
+        coverLetter: 'I am very interested and would be a great fit for this role.',
+      });
+    const applicationId: string = applyRes.body.application._id as string;
+
+    const res = await request(app)
+      .patch(`/api/employer/applications/${applicationId}/status`)
+      .set('Authorization', `Bearer ${emp.accessToken}`)
+      .send({ status: 'shortlisted', employerNote: 'Great fit' });
+
+    expect(res.status).toBe(200);
+
+    // Allow fire-and-forget email microtask to flush
+    await Promise.resolve().then(() => Promise.resolve());
+
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      seeker.email,
+      expect.any(String),
+      expect.any(String),
+      'shortlisted',
+      'Great fit',
+    );
   });
 });

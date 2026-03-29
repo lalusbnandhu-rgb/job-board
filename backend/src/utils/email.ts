@@ -1,5 +1,29 @@
+import fs from 'fs';
+import path from 'path';
+import Handlebars from 'handlebars';
 import nodemailer from 'nodemailer';
 import { env } from '../config/env';
+
+// ── Template loader ───────────────────────────────────────────────────────────
+
+const templateCache = new Map<string, HandlebarsTemplateDelegate>();
+
+/** Exposed for test teardown only — clears the in-process template cache. */
+export const clearTemplateCache = (): void => templateCache.clear();
+
+const loadTemplate = (name: string): HandlebarsTemplateDelegate => {
+  if (templateCache.has(name)) return templateCache.get(name)!;
+  const filePath = path.join(__dirname, '..', 'templates', `${name}.hbs`);
+  let source: string;
+  try {
+    source = fs.readFileSync(filePath, 'utf8');
+  } catch {
+    throw new Error(`Email template "${name}" not found at ${filePath}`);
+  }
+  const compiled = Handlebars.compile(source);
+  templateCache.set(name, compiled);
+  return compiled;
+};
 
 const createTransport = () => {
   if (env.EMAIL_HOST && env.EMAIL_USER && env.EMAIL_PASS) {
@@ -18,11 +42,12 @@ const send = async (to: string, subject: string, html: string) => {
   const transporter = createTransport();
 
   if (!transporter) {
-    console.log('\n📧 ─── DEV EMAIL (not sent — configure EMAIL_* env vars) ───');
-    console.log(`To:      ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body:\n${html}`);
-    console.log('────────────────────────────────────────────────────────────\n');
+    if (env.NODE_ENV !== 'production') {
+      console.log('\n📧 ─── DEV EMAIL (not sent — configure EMAIL_* env vars) ───');
+      console.log(`To:      ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log('────────────────────────────────────────────────────────────\n');
+    }
     return;
   }
 
@@ -57,6 +82,28 @@ export const sendVerificationEmail = async (to: string, token: string) => {
   );
 };
 
+export const STATUS_CONFIG: Record<string, { label: string; color: string; message: string }> = {
+  reviewed: {
+    label: 'Under Review',
+    color: '#2563eb',
+    message: 'Your application is being reviewed by the hiring team.',
+  },
+  shortlisted: {
+    label: 'Shortlisted',
+    color: '#16a34a',
+    message: "Great news — you've been shortlisted! The employer will be in touch soon.",
+  },
+  rejected: {
+    label: 'Not Moving Forward',
+    color: '#dc2626',
+    message:
+      'After careful consideration, the employer has decided not to move forward with your application at this time.',
+  },
+};
+
+/** Returns true for statuses that warrant an email notification to the seeker. */
+export const isNotifiableStatus = (status: string): boolean => status in STATUS_CONFIG;
+
 export const sendApplicationStatusEmail = async (
   to: string,
   seekerName: string,
@@ -64,54 +111,23 @@ export const sendApplicationStatusEmail = async (
   newStatus: string,
   employerNote?: string,
 ): Promise<void> => {
-  const statusConfig: Record<string, { label: string; color: string; message: string }> = {
-    reviewed: {
-      label: 'Under Review',
-      color: '#2563eb',
-      message: 'Your application is being reviewed by the hiring team.',
-    },
-    shortlisted: {
-      label: 'Shortlisted',
-      color: '#16a34a',
-      message: "Great news — you've been shortlisted! The employer will be in touch soon.",
-    },
-    rejected: {
-      label: 'Not Moving Forward',
-      color: '#dc2626',
-      message:
-        'After careful consideration, the employer has decided not to move forward with your application at this time.',
-    },
-  };
+  const config = STATUS_CONFIG[newStatus];
+  if (!config) return; // 'applied' status has no email notification
 
-  const config = statusConfig[newStatus];
-  if (!config) return; // 'applied' has no notification
+  const template = loadTemplate('application-status');
+  const html = template({
+    seekerName,
+    jobTitle,
+    statusLabel: config.label,
+    statusColor: config.color,
+    statusMessage: config.message,
+    employerNote: employerNote ?? null,
+    applicationsUrl: `${env.CLIENT_URL}/seeker/applications`,
+    clientUrl: env.CLIENT_URL,
+  });
 
-  await send(
-    to,
-    `Application update: ${jobTitle}`,
-    `
-    <div style="font-family:sans-serif;max-width:520px;margin:auto;color:#111827">
-      <h2 style="color:${config.color};margin-bottom:4px">Application ${config.label}</h2>
-      <p style="color:#6b7280;font-size:14px;margin-top:0">Hi ${seekerName},</p>
-      <p>${config.message}</p>
-      <div style="border-left:4px solid ${config.color};padding:12px 16px;background:#f9fafb;
-                  border-radius:0 8px 8px 0;margin:16px 0">
-        <p style="margin:0;font-weight:600">${jobTitle}</p>
-      </div>
-      ${
-        employerNote
-          ? `<p style="margin-top:16px"><strong>Note from the employer:</strong></p>
-             <p style="background:#f3f4f6;padding:12px 16px;border-radius:8px;font-size:14px;
-                        margin:0">${employerNote}</p>`
-          : ''
-      }
-      <p style="color:#6b7280;font-size:13px;margin-top:24px">
-        View all your applications on your
-        <a href="${env.CLIENT_URL}/seeker/applications" style="color:#2563eb">JobBoard dashboard</a>.
-      </p>
-    </div>
-    `,
-  );
+  const safeTitle = jobTitle.replace(/[\r\n]/g, ' ');
+  await send(to, `Application update: ${safeTitle}`, html);
 };
 
 export const sendPasswordResetEmail = async (to: string, token: string) => {

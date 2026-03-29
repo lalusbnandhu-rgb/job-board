@@ -31,6 +31,13 @@ jest.mock('../../models/application.model', () => {
 jest.mock('../../models/seeker-profile.model');
 jest.mock('../../models/user.model');
 jest.mock('../../utils/cloudinary-upload');
+jest.mock('../../utils/email', () => {
+  const actual = jest.requireActual('../../utils/email');
+  return {
+    ...actual,
+    sendApplicationStatusEmail: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
 import { Company } from '../../models/company.model';
 import { Job } from '../../models/job.model';
@@ -38,6 +45,7 @@ import { Application } from '../../models/application.model';
 import { SeekerProfile } from '../../models/seeker-profile.model';
 import { User } from '../../models/user.model';
 import * as cloudinary from '../../utils/cloudinary-upload';
+import * as email from '../../utils/email';
 import * as employerService from '../../services/employer.service';
 
 const MockCompany = Company as jest.Mocked<typeof Company>;
@@ -46,6 +54,7 @@ const MockApplication = Application as jest.Mocked<typeof Application>;
 const MockSeekerProfile = SeekerProfile as jest.Mocked<typeof SeekerProfile>;
 const MockUser = User as jest.Mocked<typeof User>;
 const mockCloudinary = cloudinary as jest.Mocked<typeof cloudinary>;
+const mockEmail = email as jest.Mocked<typeof email>;
 
 afterEach(() => jest.clearAllMocks());
 
@@ -231,10 +240,15 @@ describe('employerService.updateApplicationStatus', () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
-  it('updates status and note when authorized', async () => {
+  // Helper to set up the happy-path mocks shared across email trigger tests
+  const setupAuthorizedMocks = (seekerEmail = 'seeker@example.com', seekerProfile = { firstName: 'Jane', lastName: 'Doe' }) => {
     (MockApplication.findById as jest.Mock).mockReturnValue({
       select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ jobId: 'job-id', status: 'applied', seekerId: { toString: () => 'seeker-id' } }),
+        lean: jest.fn().mockResolvedValue({
+          jobId: 'job-id',
+          status: 'applied',
+          seekerId: { toString: () => 'seeker-id' },
+        }),
       }),
     });
     (MockJob.findById as jest.Mock).mockReturnValue({
@@ -246,10 +260,24 @@ describe('employerService.updateApplicationStatus', () => {
       }),
     });
     (MockApplication.findByIdAndUpdate as jest.Mock).mockResolvedValue(undefined);
-    // Mock fire-and-forget email dependencies so .select() calls don't throw
-    (MockSeekerProfile.findOne as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+    (MockUser.findById as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ email: seekerEmail }),
+      }),
     });
+    (MockSeekerProfile.findOne as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(seekerProfile),
+      }),
+    });
+    mockEmail.sendApplicationStatusEmail.mockResolvedValue(undefined);
+  };
+
+  // Flush the fire-and-forget Promise chain (two microtask ticks to cover nested .then)
+  const flushAsync = () => Promise.resolve().then(() => Promise.resolve());
+
+  it('updates status and note when authorized', async () => {
+    setupAuthorizedMocks();
 
     await expect(
       employerService.updateApplicationStatus('app-id', 'employer-id', 'shortlisted', 'Great candidate'),
@@ -259,5 +287,60 @@ describe('employerService.updateApplicationStatus', () => {
       'app-id',
       { status: 'shortlisted', employerNote: 'Great candidate' },
     );
+  });
+
+  it('triggers email to seeker with correct args when status is actionable', async () => {
+    setupAuthorizedMocks('jane@example.com', { firstName: 'Jane', lastName: 'Doe' });
+
+    await employerService.updateApplicationStatus('app-id', 'employer-id', 'shortlisted', 'Great fit');
+    await flushAsync();
+
+    expect(MockApplication.findByIdAndUpdate).toHaveBeenCalledWith(
+      'app-id',
+      expect.objectContaining({ status: 'shortlisted' }),
+    );
+    expect(mockEmail.sendApplicationStatusEmail).toHaveBeenCalledWith(
+      'jane@example.com',
+      'Jane Doe',
+      'Dev Job',
+      'shortlisted',
+      'Great fit',
+    );
+  });
+
+  it('uses email address as name fallback when seeker profile is missing', async () => {
+    setupAuthorizedMocks('fallback@example.com', null as unknown as { firstName: string; lastName: string });
+
+    await employerService.updateApplicationStatus('app-id', 'employer-id', 'reviewed');
+    await flushAsync();
+
+    expect(mockEmail.sendApplicationStatusEmail).toHaveBeenCalledWith(
+      'fallback@example.com',
+      'fallback@example.com',
+      'Dev Job',
+      'reviewed',
+      undefined,
+    );
+  });
+
+  it('does not trigger email when seeker user record is missing', async () => {
+    setupAuthorizedMocks();
+    (MockUser.findById as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+    });
+
+    await employerService.updateApplicationStatus('app-id', 'employer-id', 'rejected');
+    await flushAsync();
+
+    expect(mockEmail.sendApplicationStatusEmail).not.toHaveBeenCalled();
+  });
+
+  it('does not trigger email when new status is "applied"', async () => {
+    setupAuthorizedMocks();
+
+    await employerService.updateApplicationStatus('app-id', 'employer-id', 'applied');
+    await flushAsync();
+
+    expect(mockEmail.sendApplicationStatusEmail).not.toHaveBeenCalled();
   });
 });
