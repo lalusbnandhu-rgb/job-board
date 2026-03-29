@@ -13,6 +13,7 @@ import applicationRouter from './routes/application.routes';
 import employerRouter from './routes/employer.routes';
 import adminRouter from './routes/admin.routes';
 import companyRouter from './routes/company.routes';
+import notificationRouter from './routes/notification.routes';
 
 export const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/applications', applicationRouter);
 app.use('/api/employer', employerRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/companies', companyRouter);
+app.use('/api/notifications', notificationRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

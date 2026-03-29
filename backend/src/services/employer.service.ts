@@ -7,6 +7,7 @@ import { ApiError } from '../utils/errors';
 import { uploadBuffer, deleteFile } from '../utils/cloudinary-upload';
 import { parsePagination, buildPaginationMeta, type PaginationMeta } from '../utils/pagination';
 import { sendApplicationStatusEmail } from '../utils/email';
+import { createNotification } from './notification.service';
 
 // ── Input types ───────────────────────────────────────────────────────────────
 
@@ -194,8 +195,18 @@ export const updateApplicationStatus = async (
 
   await Application.findByIdAndUpdate(applicationId, update);
 
-  // Send email notification to seeker (fire-and-forget — never block the response)
+  // Fire-and-forget: notification + email to seeker
   const seekerId = application.seekerId.toString();
+
+  createNotification({
+    userId: seekerId,
+    type: 'application_status',
+    message: `Your application for "${job.title}" has been updated to ${status}.`,
+    link: '/seeker/applications',
+  }).catch((err: unknown) => {
+    // TODO: replace with structured logger once logging infrastructure is in place
+    console.error('[notification] Failed to create application status notification:', err);
+  });
   Promise.all([
     User.findById(seekerId).select('email').lean(),
     SeekerProfile.findOne({ userId: seekerId }).select('firstName lastName').lean(),

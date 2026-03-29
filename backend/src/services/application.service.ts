@@ -5,6 +5,7 @@ import { SeekerProfile } from '../models/seeker-profile.model';
 import { ApiError } from '../utils/errors';
 import { parsePagination, buildPaginationMeta } from '../utils/pagination';
 import type { ApplicationStatus } from '../models/application.model';
+import { createNotification } from './notification.service';
 
 // ── Apply to a job ─────────────────────────────────────────────────────────────
 
@@ -32,6 +33,16 @@ export const apply = async (
 
     // Increment application count (fire-and-forget)
     Job.findByIdAndUpdate(jobId, { $inc: { applicationCount: 1 } }).exec();
+
+    // Notify employer of new applicant (fire-and-forget)
+    createNotification({
+      userId: job.postedBy.toString(),
+      type: 'new_applicant',
+      message: `A new applicant has applied to your job "${job.title}".`,
+      link: `/employer/jobs/${jobId}/applicants`,
+    }).catch((err: unknown) => {
+      console.error('[notification] Failed to create new_applicant notification:', err);
+    });
 
     return application;
   } catch (err) {

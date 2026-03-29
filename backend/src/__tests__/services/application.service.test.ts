@@ -10,7 +10,11 @@ process.env.CLIENT_URL = 'http://localhost:3000';
 jest.mock('../../models/application.model');
 jest.mock('../../models/job.model');
 jest.mock('../../models/seeker-profile.model');
+jest.mock('../../services/notification.service', () => ({
+  createNotification: jest.fn().mockResolvedValue(undefined),
+}));
 
+import mongoose from 'mongoose';
 import { Application } from '../../models/application.model';
 import { Job } from '../../models/job.model';
 import { SeekerProfile } from '../../models/seeker-profile.model';
@@ -24,6 +28,7 @@ const fakeJob = (overrides = {}) => ({
   _id: 'job-1',
   title: 'Engineer',
   status: 'active',
+  postedBy: { toString: () => 'employer-1' },
   ...overrides,
 });
 
@@ -99,15 +104,12 @@ describe('applicationService.apply', () => {
     (MockJob.findById as jest.Mock).mockResolvedValue(fakeJob());
     (MockProfile.findOne as jest.Mock).mockResolvedValue(fakeProfile());
 
-    const mongoError = Object.assign(new Error('duplicate key error'), { code: 11000 });
-    // Simulate MongoServerError
-    Object.setPrototypeOf(mongoError, { constructor: { name: 'MongoServerError' } });
+    const mongoError = new mongoose.mongo.MongoServerError({ code: 11000, message: 'duplicate key error' });
     (MockApplication.create as jest.Mock).mockRejectedValue(mongoError);
 
-    // The service checks for code 11000 via instanceof MongoServerError
-    // Since we can't easily fake the full prototype chain in tests,
-    // we test the happy path above. The duplicate key path is validated by MongoDB itself.
-    // This comment documents the expected behaviour for integration tests.
+    await expect(
+      applicationService.apply('seeker-1', 'job-1', 'My cover letter'),
+    ).rejects.toMatchObject({ statusCode: 409 });
   });
 });
 

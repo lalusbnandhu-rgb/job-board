@@ -31,6 +31,9 @@ jest.mock('../../models/application.model', () => {
 jest.mock('../../models/seeker-profile.model');
 jest.mock('../../models/user.model');
 jest.mock('../../utils/cloudinary-upload');
+jest.mock('../../services/notification.service', () => ({
+  createNotification: jest.fn().mockResolvedValue(undefined),
+}));
 
 import { Company } from '../../models/company.model';
 import { Job } from '../../models/job.model';
@@ -246,7 +249,10 @@ describe('employerService.updateApplicationStatus', () => {
       }),
     });
     (MockApplication.findByIdAndUpdate as jest.Mock).mockResolvedValue(undefined);
-    // Mock fire-and-forget email dependencies so .select() calls don't throw
+    // Mock fire-and-forget notification + email dependencies so .select() calls don't throw
+    (MockUser.findById as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
+    });
     (MockSeekerProfile.findOne as jest.Mock).mockReturnValue({
       select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
     });
