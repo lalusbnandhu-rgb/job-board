@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Briefcase, ShieldCheck, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, FileText, ShieldCheck, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/jobs', label: 'Jobs', icon: Briefcase },
+  { href: '/admin/applications', label: 'Applications', icon: FileText },
 ];
 
 export function AdminSidebar() {

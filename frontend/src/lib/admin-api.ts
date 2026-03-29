@@ -1,5 +1,5 @@
 import api from './api';
-import type { PlatformStats, AdminUserListResponse, AdminJobListResponse } from '@/types/admin';
+import type { PlatformStats, AdminUserListResponse, AdminJobListResponse, AdminApplicationListResponse } from '@/types/admin';
 
 export const adminApi = {
   getStats: (): Promise<{ data: { stats: PlatformStats } }> =>
@@ -29,4 +29,13 @@ export const adminApi = {
 
   deleteJob: (id: string): Promise<void> =>
     api.delete(`/admin/jobs/${id}`),
+
+  listApplications: (params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    jobId?: string;
+    seekerId?: string;
+  }): Promise<{ data: AdminApplicationListResponse }> =>
+    api.get('/admin/applications', { params }),
 };

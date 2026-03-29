@@ -32,3 +32,9 @@ export const deleteJob = async (req: Request, res: Response): Promise<void> => {
   await adminService.deleteJob(req.params.id);
   res.status(204).send();
 };
+
+export const listApplications = async (req: Request, res: Response): Promise<void> => {
+  const { page, limit, status, jobId, seekerId } = req.query as Record<string, string>;
+  const result = await adminService.listAllApplications(page, limit, status, jobId, seekerId);
+  res.json(result);
+};

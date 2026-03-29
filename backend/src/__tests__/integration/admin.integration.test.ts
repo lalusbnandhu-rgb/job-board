@@ -204,3 +204,103 @@ describe('DELETE /api/admin/jobs/:id', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ── GET /api/admin/applications ───────────────────────────────────────────────
+
+describe('GET /api/admin/applications', () => {
+  it('200 — returns all applications', async () => {
+    const admin = await createAdmin();
+    const emp = await createEmployerWithCompany();
+    const { jobId } = await createJob(emp.accessToken);
+    const seeker = await createSeekerWithProfile();
+
+    await request(app)
+      .post('/api/applications')
+      .set('Authorization', `Bearer ${seeker.accessToken}`)
+      .send({
+        jobId,
+        coverLetter: 'I am very interested and would be a great fit for this role.',
+      });
+
+    const res = await request(app)
+      .get('/api/admin/applications')
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('applications');
+    expect(res.body).toHaveProperty('pagination');
+    expect(Array.isArray(res.body.applications)).toBe(true);
+    expect(res.body.applications.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('200 — filters by status', async () => {
+    const admin = await createAdmin();
+    const emp = await createEmployerWithCompany();
+    const { jobId } = await createJob(emp.accessToken);
+    const seeker = await createSeekerWithProfile();
+
+    await request(app)
+      .post('/api/applications')
+      .set('Authorization', `Bearer ${seeker.accessToken}`)
+      .send({
+        jobId,
+        coverLetter: 'I am very interested and would be a great fit for this role.',
+      });
+
+    const res = await request(app)
+      .get('/api/admin/applications?status=applied')
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(res.status).toBe(200);
+    expect(
+      (res.body.applications as Array<{ status: string }>).every((a) => a.status === 'applied'),
+    ).toBe(true);
+  });
+
+  it('200 — returns empty list when no applications', async () => {
+    const admin = await createAdmin();
+    const res = await request(app)
+      .get('/api/admin/applications')
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.applications).toHaveLength(0);
+  });
+
+  it('200 — filters by jobId returns only that job\'s applications', async () => {
+    const admin = await createAdmin();
+    const emp = await createEmployerWithCompany();
+    const { jobId: jobId1 } = await createJob(emp.accessToken);
+    const { jobId: jobId2 } = await createJob(emp.accessToken, { title: 'Another Role Here Today' });
+    const seeker = await createSeekerWithProfile();
+
+    await request(app)
+      .post('/api/applications')
+      .set('Authorization', `Bearer ${seeker.accessToken}`)
+      .send({ jobId: jobId1, coverLetter: 'I am very interested and would be a great fit for this role.' });
+
+    const res = await request(app)
+      .get(`/api/admin/applications?jobId=${jobId2}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.applications).toHaveLength(0);
+  });
+
+  it('400 — rejects invalid status value', async () => {
+    const admin = await createAdmin();
+    const res = await request(app)
+      .get('/api/admin/applications?status=hired')
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('401 — unauthenticated', async () => {
+    const res = await request(app).get('/api/admin/applications');
+    expect(res.status).toBe(401);
+  });
+
+  it('403 — seeker cannot access admin applications', async () => {
+    const seeker = await createSeekerWithProfile();
+    const res = await request(app)
+      .get('/api/admin/applications')
+      .set('Authorization', `Bearer ${seeker.accessToken}`);
+    expect(res.status).toBe(403);
+  });
+});

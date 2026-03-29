@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
 import { validateQuery, validateParams } from '../middleware/validate';
 import { objectId, numericString } from '../utils/validators';
+import { APPLICATION_STATUSES } from '../models/application.model';
 
 const router = Router();
 
@@ -17,6 +18,14 @@ const listQuerySchema = z.object({
   role: z.enum(['seeker', 'employer', 'admin']).optional(),
   status: z.enum(['active', 'paused', 'closed']).optional(),
   search: z.string().max(200).trim().optional(),
+});
+
+const applicationQuerySchema = z.object({
+  page: numericString(),
+  limit: numericString(),
+  status: z.enum(APPLICATION_STATUSES).optional(),
+  jobId: objectId().optional(),
+  seekerId: objectId().optional(),
 });
 
 const idParamSchema = z.object({ id: objectId() });
@@ -32,5 +41,8 @@ router.patch('/users/:id/unban', validateParams(idParamSchema), adminController.
 // ── Jobs ──────────────────────────────────────────────────────────────────────
 router.get('/jobs', validateQuery(listQuerySchema), adminController.listJobs);
 router.delete('/jobs/:id', validateParams(idParamSchema), adminController.deleteJob);
+
+// ── Applications ──────────────────────────────────────────────────────────────
+router.get('/applications', validateQuery(applicationQuerySchema), adminController.listApplications);
 
 export default router;

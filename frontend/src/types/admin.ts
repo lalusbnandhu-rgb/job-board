@@ -32,6 +32,19 @@ export interface AdminJob {
   companyId: { name: string; logo?: string } | null;
 }
 
+export interface AdminApplication {
+  _id: string;
+  status: 'applied' | 'reviewed' | 'shortlisted' | 'rejected';
+  createdAt: string;
+  seekerId: { _id: string; email: string } | null;
+  jobId: {
+    _id: string;
+    title: string;
+    slug: string;
+    companyId: { name: string } | null;
+  } | null;
+}
+
 export interface AdminUserListResponse {
   users: AdminUser[];
   pagination: PaginationMeta;
@@ -39,5 +52,10 @@ export interface AdminUserListResponse {
 
 export interface AdminJobListResponse {
   jobs: AdminJob[];
+  pagination: PaginationMeta;
+}
+
+export interface AdminApplicationListResponse {
+  applications: AdminApplication[];
   pagination: PaginationMeta;
 }

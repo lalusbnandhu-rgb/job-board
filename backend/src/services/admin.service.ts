@@ -121,3 +121,50 @@ export const deleteJob = async (jobId: string): Promise<void> => {
   // Clean up associated applications (fire-and-forget)
   Application.deleteMany({ jobId }).exec();
 };
+
+// ── Applications ──────────────────────────────────────────────────────────────
+
+export interface AdminApplicationItem {
+  _id: string;
+  status: string;
+  createdAt: Date;
+  seekerId: { _id: string; email: string } | null;
+  jobId: {
+    _id: string;
+    title: string;
+    slug: string;
+    companyId: { name: string } | null;
+  } | null;
+}
+
+export const listAllApplications = async (
+  rawPage?: string,
+  rawLimit?: string,
+  status?: string,
+  jobId?: string,
+  seekerId?: string,
+): Promise<{ applications: AdminApplicationItem[]; pagination: ReturnType<typeof buildPaginationMeta> }> => {
+  const { page, limit, skip } = parsePagination(rawPage, rawLimit);
+  const filter: Record<string, unknown> = {};
+  if (status) filter.status = status;
+  if (jobId) filter.jobId = jobId;
+  if (seekerId) filter.seekerId = seekerId;
+
+  const [applications, total] = await Promise.all([
+    Application.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate([
+        { path: 'seekerId', select: 'email' },
+        { path: 'jobId', select: 'title slug companyId', populate: { path: 'companyId', select: 'name' } },
+      ])
+      .lean(),
+    Application.countDocuments(filter),
+  ]);
+
+  return {
+    applications: applications as unknown as AdminApplicationItem[],
+    pagination: buildPaginationMeta(total, page, limit),
+  };
+};

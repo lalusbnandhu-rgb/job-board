@@ -7,6 +7,8 @@ export const adminKeys = {
     ['admin', 'users', page, role, search] as const,
   jobs: (page: number, status?: string, search?: string) =>
     ['admin', 'jobs', page, status, search] as const,
+  applications: (page: number, status?: string, jobId?: string, seekerId?: string) =>
+    ['admin', 'applications', page, status, jobId, seekerId] as const,
 };
 
 export const useAdminStats = () =>
@@ -49,3 +51,11 @@ export const useAdminDeleteJob = () => {
     },
   });
 };
+
+export const useAdminApplications = (page = 1, status?: string) =>
+  useQuery({
+    queryKey: adminKeys.applications(page, status),
+    queryFn: () =>
+      adminApi.listApplications({ page, limit: 20, status }).then((r) => r.data),
+    staleTime: 30_000,
+  });
