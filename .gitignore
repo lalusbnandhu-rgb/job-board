@@ -37,3 +37,9 @@ coverage/
 e2e/.auth/
 test-results/
 playwright-report/
+e2e/*.webm
+e2e/*-concat.txt
+e2e/*-videos.txt
+
+# Claude Code
+.claude/

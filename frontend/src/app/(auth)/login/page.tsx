@@ -23,11 +23,20 @@ import {
 import type { LoginResponse, ApiErrorBody } from '@/types';
 import { AxiosError } from 'axios';
 
+const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
+
+function getSavedEmail(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? '';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [rememberUsername, setRememberUsername] = useState(() => !!getSavedEmail());
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
 
   const {
     register,
@@ -35,6 +44,7 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { email: getSavedEmail() },
   });
 
   const onSubmit = async (values: LoginFormData) => {
@@ -43,7 +53,21 @@ export default function LoginPage() {
       const { data } = await authApi.login(values);
       const res = data as LoginResponse;
 
-      localStorage.setItem('refreshToken', res.refreshToken);
+      if (rememberUsername) {
+        localStorage.setItem(REMEMBERED_EMAIL_KEY, values.email);
+      } else {
+        localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      }
+
+      const sessionExpiry = (Date.now() + 24 * 60 * 60 * 1000).toString();
+      if (keepSignedIn) {
+        localStorage.setItem('refreshToken', res.refreshToken);
+        localStorage.setItem('sessionExpiry', sessionExpiry);
+      } else {
+        sessionStorage.setItem('refreshToken', res.refreshToken);
+        sessionStorage.setItem('sessionExpiry', sessionExpiry);
+      }
+
       setAuth(
         {
           id: res.user.id,
@@ -140,6 +164,28 @@ export default function LoginPage() {
               error={errors.password?.message}
               {...register('password')}
             />
+          </div>
+
+          {/* Remember / Keep signed in */}
+          <div className="flex flex-col gap-2.5">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberUsername}
+                onChange={(e) => setRememberUsername(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600">Remember username</span>
+            </label>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={keepSignedIn}
+                onChange={(e) => setKeepSignedIn(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600">Keep me signed in</span>
+            </label>
           </div>
 
           <Button type="submit" className="w-full" isLoading={isSubmitting}>

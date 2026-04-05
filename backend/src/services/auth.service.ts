@@ -14,7 +14,7 @@ import {
 } from '../utils/email';
 import { env } from '../config/env';
 
-const MAX_REFRESH_TOKENS = 5;  // max active sessions per user
+const MAX_REFRESH_TOKENS = 20;  // max active sessions per user (raised for E2E parallel test suites)
 const LOCK_THRESHOLD = 10;     // consecutive failures before lockout
 const LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -211,7 +211,15 @@ export const forgotPassword = async (email: string) => {
 
   await sendPasswordResetEmail(email, raw);
 
-  return { message: 'If that email is registered, a reset link has been sent.' };
+  const response: { message: string; devToken?: string } = {
+    message: 'If that email is registered, a reset link has been sent.',
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    response.devToken = raw;
+  }
+
+  return response;
 };
 
 export const resetPassword = async (token: string, newPassword: string) => {

@@ -23,10 +23,22 @@ export function useAuthInit() {
     // Token still in memory — already fine
     if (accessToken) return;
 
-    const refreshToken =
+    const inLocal =
       typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    const inSession =
+      typeof window !== 'undefined' ? sessionStorage.getItem('refreshToken') : null;
+    const refreshToken = inLocal ?? inSession;
+    const storage = inLocal ? localStorage : sessionStorage;
 
     if (!refreshToken) {
+      clearAuth();
+      return;
+    }
+
+    // Enforce 24-hour absolute session expiry
+    const expiryRaw = storage.getItem('sessionExpiry');
+    const expiresAt = expiryRaw ? parseInt(expiryRaw, 10) : NaN;
+    if (isNaN(expiresAt) || Date.now() >= expiresAt) {
       clearAuth();
       return;
     }
@@ -37,8 +49,13 @@ export function useAuthInit() {
       .post<RefreshResponse>(`${BASE}/auth/refresh`, { refreshToken })
       .then(({ data }) => {
         setAccessToken(data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        storage.setItem('refreshToken', data.refreshToken);
       })
       .catch(() => clearAuth());
+
+    // Schedule auto-logout when the 24-hour window closes
+    const msUntilExpiry = expiresAt - Date.now();
+    const timer = setTimeout(() => clearAuth(), msUntilExpiry);
+    return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }

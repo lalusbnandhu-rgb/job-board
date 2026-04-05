@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Mail, ArrowLeft } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { authApi } from '@/lib/api';
@@ -24,6 +25,7 @@ import {
 import type { ApiErrorBody } from '@/types';
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [success, setSuccess] = useState('');
   const [serverError, setServerError] = useState('');
 
@@ -39,7 +41,15 @@ export default function ForgotPasswordPage() {
     setServerError('');
     try {
       const { data } = await authApi.forgotPassword(values.email);
-      setSuccess((data as { message: string }).message);
+      const res = data as { message: string; devToken?: string };
+
+      // In local dev the backend returns the raw token — skip the email journey
+      if (res.devToken) {
+        router.push(`/reset-password?token=${res.devToken}`);
+        return;
+      }
+
+      setSuccess(res.message);
     } catch (err) {
       const error = err as AxiosError<ApiErrorBody>;
       setServerError(

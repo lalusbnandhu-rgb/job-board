@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { apiLogin, apiPost, updateRefreshToken } from '../helpers/api-client';
+import { apiLogin, apiPost, apiRefresh, readRefreshToken, updateRefreshToken } from '../helpers/api-client';
 
 /**
  * E2E — Employer flows (authenticated)
@@ -31,8 +31,31 @@ test.use({ storageState: EMPLOYER_AUTH_FILE });
 // Run tests serially so the rotating refresh token stays valid across tests.
 test.describe.configure({ mode: 'serial' });
 
-// ── Deduplicate concurrent /auth/refresh calls within each test ────────────
+// ── Pre-warm token + deduplicate concurrent /auth/refresh calls ────────────
+// Each test starts with a guaranteed-fresh token injected via addInitScript so
+// that a prior test's failed afterEach cannot leave a consumed token in the file.
 test.beforeEach(async ({ page }) => {
+  // Pre-warm: exchange current file token for a fresh one before page load.
+  try {
+    const current = readRefreshToken(EMPLOYER_AUTH_FILE);
+    const { refreshToken: fresh } = await apiRefresh(current);
+    updateRefreshToken(EMPLOYER_AUTH_FILE, fresh);
+    await page.addInitScript((token) => {
+      localStorage.setItem('refreshToken', token);
+    }, fresh);
+  } catch {
+    // Refresh failed — fall back to a full login.
+    try {
+      const { refreshToken: fresh } = await apiLogin('alice@techcorp.dev', 'Employer123!');
+      updateRefreshToken(EMPLOYER_AUTH_FILE, fresh);
+      await page.addInitScript((token) => {
+        localStorage.setItem('refreshToken', token);
+      }, fresh);
+    } catch {
+      // Both failed — continue with storageState as-is.
+    }
+  }
+
   let refreshCache: string | null = null;
   let refreshPending = false;
   const refreshWaiters: Array<() => void> = [];
@@ -48,12 +71,18 @@ test.beforeEach(async ({ page }) => {
       return;
     }
     refreshPending = true;
-    const response = await route.fetch();
-    const body = await response.text();
-    if (response.status() === 200) refreshCache = body;
-    refreshPending = false;
-    refreshWaiters.splice(0).forEach((r) => r());
-    await route.fulfill({ status: response.status(), contentType: 'application/json', body });
+    try {
+      const response = await route.fetch();
+      const body = await response.text();
+      if (response.status() === 200) refreshCache = body;
+      refreshPending = false;
+      refreshWaiters.splice(0).forEach((r) => r());
+      await route.fulfill({ status: response.status(), contentType: 'application/json', body });
+    } catch {
+      refreshPending = false;
+      refreshWaiters.splice(0).forEach((r) => r());
+      await route.abort().catch(() => null);
+    }
   });
 });
 
@@ -65,6 +94,11 @@ test.afterEach(async ({ page }) => {
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
 test.describe('Employer Dashboard', () => {
+  test.beforeAll(async () => {
+    const emp = await apiLogin('alice@techcorp.dev', 'Employer123!');
+    updateRefreshToken(EMPLOYER_AUTH_FILE, emp.refreshToken);
+  });
+
   test('dashboard loads with heading', async ({ page }) => {
     await page.goto('/employer/dashboard');
     // Heading is "Welcome, TechCorp" when company profile exists, or "Employer Dashboard" fallback
@@ -86,6 +120,11 @@ test.describe('Employer Dashboard', () => {
 
 // ── My Job Listings ────────────────────────────────────────────────────────
 test.describe('Employer Jobs', () => {
+  test.beforeAll(async () => {
+    const emp = await apiLogin('alice@techcorp.dev', 'Employer123!');
+    updateRefreshToken(EMPLOYER_AUTH_FILE, emp.refreshToken);
+  });
+
   test('jobs list page loads', async ({ page }) => {
     await page.goto('/employer/jobs');
     await expect(
@@ -101,8 +140,11 @@ test.describe('Employer Jobs', () => {
   test('seeded TechCorp jobs appear in the list', async ({ page }) => {
     await page.goto('/employer/jobs');
     await expect(page.locator('main')).toBeVisible({ timeout: 10_000 });
-    // alice has seeded jobs, at least one row/item should appear
-    await expect(page.locator('main').getByText(/.+/)).toBeVisible({ timeout: 10_000 });
+    // Wait for at least one job to be visible — either seeded jobs or E2E test jobs
+    // created by previous runs (which accumulate on page 1 when sorted by newest).
+    await expect(
+      page.getByText(/Senior Backend Engineer|Product Manager|DevOps Engineer|Junior Frontend|E2E/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test('post new job — full form flow redirects to jobs list', async ({ page }) => {
@@ -112,23 +154,25 @@ test.describe('Employer Jobs', () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await page.getByLabel(/title/i).fill(`E2E Test Job ${Date.now()}`);
-    await page.getByLabel(/description/i).first().fill(
+    // Description and requirements fields use placeholders, not <label> elements
+    await page.locator('textarea').nth(0).fill(
       'This is an E2E test job description with enough characters to pass validation requirements.',
     );
-    await page.getByLabel(/requirement/i).first().fill(
+    await page.locator('textarea').nth(1).fill(
       'Strong TypeScript and Node.js skills required for this E2E test position.',
     );
     await page.getByLabel(/location/i).fill('Remote, Earth');
 
-    // Select all native <select> dropdowns by iterating them
+    // Select all native <select> dropdowns by iterating them.
+    // selectOption requires a string (not a regex) for label/value matching.
     const selects = page.locator('select');
     const count = await selects.count();
     for (let i = 0; i < count; i++) {
       const sel = selects.nth(i);
       const opts = await sel.locator('option').allTextContents();
-      if (opts.some((o) => /full.time/i.test(o))) await sel.selectOption({ label: /full.time/i });
+      if (opts.some((o) => /full.?time/i.test(o))) await sel.selectOption({ value: 'full-time' });
       else if (opts.some((o) => /engineering/i.test(o))) await sel.selectOption({ value: 'Engineering' });
-      else if (opts.some((o) => /^mid$/i.test(o))) await sel.selectOption({ value: 'mid' });
+      else if (opts.some((o) => /^mid/i.test(o))) await sel.selectOption({ value: 'mid' });
       else if (opts.some((o) => /^USD$/.test(o))) await sel.selectOption({ value: 'USD' });
     }
 
@@ -153,8 +197,9 @@ test.describe('Employer Applicants', () => {
     );
     jobId = jobRes.job._id;
 
+    // Login as Emma just to get an accessToken for the API call — do NOT write
+    // to SEEKER_AUTH_FILE as the seeker spec may be running concurrently.
     const seeker = await apiLogin('emma@example.com', 'Seeker123!');
-    updateRefreshToken(SEEKER_AUTH_FILE, seeker.refreshToken);
     await apiPost<unknown>(
       '/applications',
       { jobId, coverLetter: COVER_LETTER },
@@ -172,7 +217,7 @@ test.describe('Employer Applicants', () => {
   test('emma appears as an applicant', async ({ page }) => {
     await page.goto(`/employer/jobs/${jobId}/applicants`);
     await expect(page.getByRole('heading', { name: /applicants/i })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/emma/i)).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText(/emma/i).first()).toBeVisible({ timeout: 8_000 });
   });
 
   test('employer can change application status via select dropdown', async ({ page }) => {
@@ -202,6 +247,11 @@ test.describe('Employer Applicants', () => {
 
 // ── Company Profile ────────────────────────────────────────────────────────
 test.describe('Employer Company Profile', () => {
+  test.beforeAll(async () => {
+    const emp = await apiLogin('alice@techcorp.dev', 'Employer123!');
+    updateRefreshToken(EMPLOYER_AUTH_FILE, emp.refreshToken);
+  });
+
   test('company profile page loads with TechCorp data', async ({ page }) => {
     await page.goto('/employer/company');
     await expect(

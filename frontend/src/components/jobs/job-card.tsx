@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { MapPin, Clock, Bookmark, BookmarkCheck, Wifi } from 'lucide-react';
 import { formatDistanceToNow } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
@@ -15,13 +18,15 @@ interface JobCardProps {
 }
 
 export function JobCard({ job, isSaved = false, onSave, className }: JobCardProps) {
+  const router = useRouter();
   const company = job.companyId;
 
   return (
     <article
+      onClick={() => router.push(`/jobs/${job.slug}`)}
       className={cn(
         'group relative flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-6',
-        'shadow-sm transition-all hover:shadow-md hover:border-blue-100 hover:-translate-y-0.5',
+        'shadow-sm transition-all hover:shadow-md hover:border-blue-100 hover:-translate-y-0.5 cursor-pointer',
         className,
       )}
     >
@@ -30,7 +35,7 @@ export function JobCard({ job, isSaved = false, onSave, className }: JobCardProp
         <button
           type="button"
           onClick={(e) => {
-            e.preventDefault();
+            e.stopPropagation();
             onSave(job._id);
           }}
           aria-label={isSaved ? 'Unsave job' : 'Save job'}
@@ -68,15 +73,13 @@ export function JobCard({ job, isSaved = false, onSave, className }: JobCardProp
         </div>
 
         <div className="min-w-0">
-          <Link
-            href={`/jobs/${job.slug}`}
-            className="block text-base font-bold text-gray-900 hover:text-blue-600 line-clamp-2 transition-colors"
-          >
+          <span className="block text-base font-bold text-gray-900 group-hover:text-blue-600 line-clamp-2 transition-colors">
             {job.title}
-          </Link>
+          </span>
           {company?.slug ? (
             <Link
               href={`/companies/${company.slug}`}
+              onClick={(e) => e.stopPropagation()}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               {company.name}

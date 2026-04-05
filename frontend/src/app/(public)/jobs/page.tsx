@@ -7,6 +7,8 @@ import { JobFilters } from '@/components/jobs/job-filters';
 import { Pagination } from '@/components/ui/pagination';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useAuthStore } from '@/store/auth.store';
+import { useProfile, useSaveJob, useUnsaveJob } from '@/hooks/use-seeker';
 import type { JobFilters as IJobFilters } from '@/types/jobs';
 import type { Metadata } from 'next';
 
@@ -17,6 +19,33 @@ export default function JobsPage() {
   const [filters, setFilters] = useState<IJobFilters>({ page: 1, limit: 20 });
 
   const { data, isLoading, isError } = useJobs(filters);
+  const user = useAuthStore((s) => s.user);
+  const isSeeker = user?.role === 'seeker';
+  const { data: profile } = useProfile();
+  const saveJob = useSaveJob();
+  const unsaveJob = useUnsaveJob();
+
+  // Manual toggles: once a user clicks, their action takes precedence over profile data
+  const [toggles, setToggles] = useState<Record<string, boolean>>({});
+
+  const getIsSaved = useCallback((jobId: string) => {
+    if (jobId in toggles) return toggles[jobId];
+    return profile?.savedJobs?.includes(jobId) ?? false;
+  }, [toggles, profile]);
+
+  const handleSave = useCallback((jobId: string) => {
+    const currentlySaved = getIsSaved(jobId);
+    setToggles((prev) => ({ ...prev, [jobId]: !currentlySaved }));
+    if (currentlySaved) {
+      unsaveJob.mutate(jobId, {
+        onError: () => setToggles((prev) => ({ ...prev, [jobId]: true })),
+      });
+    } else {
+      saveJob.mutate(jobId, {
+        onError: () => setToggles((prev) => ({ ...prev, [jobId]: false })),
+      });
+    }
+  }, [getIsSaved, saveJob, unsaveJob]);
 
   const handlePageChange = useCallback(
     (page: number) => setFilters((f) => ({ ...f, page })),
@@ -77,7 +106,12 @@ export default function JobsPage() {
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {data.jobs.map((job) => (
-                  <JobCard key={job._id} job={job} />
+                  <JobCard
+                    key={job._id}
+                    job={job}
+                    isSaved={getIsSaved(job._id)}
+                    onSave={isSeeker ? handleSave : undefined}
+                  />
                 ))}
               </div>
             )}

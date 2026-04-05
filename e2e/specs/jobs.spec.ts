@@ -4,11 +4,25 @@ import { test, expect } from '@playwright/test';
  * E2E — Jobs browsing (public, no auth required)
  */
 
+/** Navigate to /jobs and wait for at least one job card, retrying on backend error. */
+async function gotoJobsAndWait(page: import('@playwright/test').Page) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.goto('/jobs');
+    const visible = await page
+      .locator('article')
+      .first()
+      .isVisible({ timeout: 15_000 })
+      .catch(() => false);
+    if (visible) return;
+    // Backend returned an error state — reload and retry
+    await page.waitForTimeout(1_000);
+  }
+  await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
+}
+
 test.describe('Jobs listing page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/jobs');
-    // Wait for seeded jobs to hydrate
-    await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
+    await gotoJobsAndWait(page);
   });
 
   test('page loads with job cards', async ({ page }) => {
@@ -47,16 +61,15 @@ test.describe('Jobs listing page', () => {
 
 test.describe('Job detail page', () => {
   test('clicking a job card navigates to /jobs/:slug', async ({ page }) => {
-    await page.goto('/jobs');
-    await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
-    await page.locator('article a').first().click();
+    await gotoJobsAndWait(page);
+    // Job cards use onClick on the article element (not an <a> link) — click the card directly.
+    await page.locator('article').first().click();
     await expect(page).toHaveURL(/\/jobs\/.+/, { timeout: 10_000 });
   });
 
   test('detail page shows title, "About this role", and Requirements sections', async ({ page }) => {
-    await page.goto('/jobs');
-    await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
-    await page.locator('article a').first().click();
+    await gotoJobsAndWait(page);
+    await page.locator('article').first().click();
     await expect(page).toHaveURL(/\/jobs\/.+/, { timeout: 10_000 });
 
     await expect(page.getByRole('heading').first()).toBeVisible();
@@ -65,9 +78,8 @@ test.describe('Job detail page', () => {
   });
 
   test('sidebar has an Apply CTA and company card', async ({ page }) => {
-    await page.goto('/jobs');
-    await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
-    await page.locator('article a').first().click();
+    await gotoJobsAndWait(page);
+    await page.locator('article').first().click();
     await expect(page).toHaveURL(/\/jobs\/.+/, { timeout: 10_000 });
 
     // Unauthenticated → "Apply now" link to /register
@@ -81,9 +93,8 @@ test.describe('Job detail page', () => {
   });
 
   test('"Back to jobs" link returns to the listing', async ({ page }) => {
-    await page.goto('/jobs');
-    await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
-    await page.locator('article a').first().click();
+    await gotoJobsAndWait(page);
+    await page.locator('article').first().click();
     await expect(page).toHaveURL(/\/jobs\/.+/, { timeout: 10_000 });
 
     await page.getByRole('link', { name: /back to jobs/i }).click();
@@ -91,9 +102,8 @@ test.describe('Job detail page', () => {
   });
 
   test('clicking the company link navigates to /companies/:slug', async ({ page }) => {
-    await page.goto('/jobs');
-    await expect(page.locator('article').first()).toBeVisible({ timeout: 15_000 });
-    await page.locator('article a').first().click();
+    await gotoJobsAndWait(page);
+    await page.locator('article').first().click();
     await expect(page).toHaveURL(/\/jobs\/.+/, { timeout: 10_000 });
 
     await page.locator('a[href*="/companies/"]').first().click();

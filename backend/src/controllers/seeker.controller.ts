@@ -28,6 +28,11 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   res.json({ resumeUrl: profile.resumeUrl, resumeFileName: profile.resumeFileName });
 };
 
+export const deleteResume = async (req: Request, res: Response): Promise<void> => {
+  await seekerService.deleteResume(req.user!.id);
+  res.status(204).send();
+};
+
 export const getSavedJobs = async (req: Request, res: Response): Promise<void> => {
   const { page, limit } = req.query as Record<string, string>;
   const result = await seekerService.getSavedJobs(req.user!.id, page, limit);

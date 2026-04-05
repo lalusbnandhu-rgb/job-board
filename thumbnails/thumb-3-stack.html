@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1200px;
+    height: 750px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    background: #020617;
+  }
+
+  /* Gradient mesh background */
+  .mesh {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 80% 20%, rgba(99,102,241,0.2) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 60% at 20% 80%, rgba(16,185,129,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(139,92,246,0.08) 0%, transparent 70%);
+  }
+
+  /* Thin horizontal lines */
+  .lines {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 79px,
+      rgba(255,255,255,0.03) 79px,
+      rgba(255,255,255,0.03) 80px
+    );
+  }
+
+  .layout {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 50px 80px;
+  }
+
+  /* Top header */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.3);
+    color: #818cf8;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 100px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 58px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: #fff;
+    margin-bottom: 14px;
+  }
+
+  h1 .grad {
+    background: linear-gradient(90deg, #6366f1, #a78bfa, #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    color: #475569;
+    font-size: 16px;
+  }
+
+  /* Stack grid */
+  .stack-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 900px;
+  }
+
+  .tech {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px 18px;
+    transition: border-color 0.2s;
+  }
+
+  .tech-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .tech-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+
+  .tech-role {
+    font-size: 11px;
+    color: #475569;
+    margin-top: 1px;
+  }
+
+  /* Bottom stats bar */
+  .stats-bar {
+    margin-top: 40px;
+    display: flex;
+    gap: 0;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    overflow: hidden;
+    width: 100%;
+    max-width: 860px;
+  }
+
+  .stat {
+    flex: 1;
+    padding: 18px 24px;
+    text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.07);
+  }
+  .stat:last-child { border-right: none; }
+
+  .stat-num {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.02em;
+  }
+
+  .stat-num.indigo { color: #818cf8; }
+  .stat-num.green  { color: #34d399; }
+  .stat-num.amber  { color: #fbbf24; }
+  .stat-num.rose   { color: #fb7185; }
+
+  .stat-lbl {
+    font-size: 12px;
+    color: #475569;
+    margin-top: 3px;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<div class="mesh"></div>
+<div class="lines"></div>
+
+<div class="layout">
+
+  <div class="header">
+    <div class="kicker">Full-Stack Web Application</div>
+    <h1>Job Board <span class="grad">Platform</span></h1>
+    <p class="tagline">End-to-end TypeScript · Three user roles · Production-ready architecture</p>
+  </div>
+
+  <div class="stack-grid">
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#1a1a2e">⚛️</div>
+      <div>
+        <div class="tech-name">Next.js 15</div>
+        <div class="tech-role">App Router · SSR</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#1a2e1a">🟢</div>
+      <div>
+        <div class="tech-name">Node.js + Express</div>
+        <div class="tech-role">REST API</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#1a2e1a">🍃</div>
+      <div>
+        <div class="tech-name">MongoDB</div>
+        <div class="tech-role">Mongoose ODM</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#1a1a2e">🔷</div>
+      <div>
+        <div class="tech-name">TypeScript</div>
+        <div class="tech-role">Strict mode</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#2e1a1a">🐳</div>
+      <div>
+        <div class="tech-name">Docker Compose</div>
+        <div class="tech-role">Full stack</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#2e2a1a">🔐</div>
+      <div>
+        <div class="tech-name">JWT Auth</div>
+        <div class="tech-role">Rotating tokens</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#1a2a1e">🐻</div>
+      <div>
+        <div class="tech-name">Zustand</div>
+        <div class="tech-role">State management</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#2e1a2a">🎭</div>
+      <div>
+        <div class="tech-name">Playwright</div>
+        <div class="tech-role">E2E testing</div>
+      </div>
+    </div>
+
+    <div class="tech">
+      <div class="tech-icon" style="background:#1a2e2e">💨</div>
+      <div>
+        <div class="tech-name">Tailwind CSS v4</div>
+        <div class="tech-role">UI styling</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-num indigo">3</div>
+      <div class="stat-lbl">User Roles</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num green">70</div>
+      <div class="stat-lbl">E2E Tests</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num amber">REST API</div>
+      <div class="stat-lbl">Architecture</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num rose">JWT</div>
+      <div class="stat-lbl">Auth Strategy</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" style="color:#67e8f9">Docker</div>
+      <div class="stat-lbl">1-cmd deploy</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -83,6 +83,22 @@ export const uploadResume = async (
   return profile as unknown as ISeekerProfile;
 };
 
+// ── Resume delete ─────────────────────────────────────────────────────────────
+
+export const deleteResume = async (userId: string): Promise<void> => {
+  const profile = await SeekerProfile.findOne({ userId }).select('+resumePublicId');
+  if (!profile?.resumeUrl) throw new ApiError(404, 'No resume to delete');
+
+  if (profile.resumePublicId) {
+    await deleteFile(profile.resumePublicId);
+  }
+
+  await SeekerProfile.findOneAndUpdate(
+    { userId },
+    { $unset: { resumeUrl: '', resumePublicId: '', resumeFileName: '' } },
+  );
+};
+
 // ── Saved jobs ────────────────────────────────────────────────────────────────
 
 export const getSavedJobs = async (

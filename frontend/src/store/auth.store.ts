@@ -30,6 +30,9 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('sessionExpiry');
+          sessionStorage.removeItem('refreshToken');
+          sessionStorage.removeItem('sessionExpiry');
         }
         set({ user: null, accessToken: null });
       },

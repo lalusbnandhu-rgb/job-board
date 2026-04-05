@@ -37,8 +37,9 @@ services:
       # Override DB URI to use Docker service name (not localhost)
       - MONGODB_URI=mongodb://mongodb:27017/jobboard
       # Raised limits for local dev & E2E testing (production keeps the low defaults)
-      - LOGIN_RATE_LIMIT_MAX=50
-      - REGISTER_RATE_LIMIT_MAX=20
+      - API_RATE_LIMIT_MAX=1000
+      - LOGIN_RATE_LIMIT_MAX=100
+      - REGISTER_RATE_LIMIT_MAX=50
     depends_on:
       mongodb:
         condition: service_healthy

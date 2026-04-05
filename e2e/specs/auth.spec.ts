@@ -98,7 +98,9 @@ test.describe('Logout', () => {
     const logoutBtn = page.getByRole('button', { name: /logout|sign out|log out/i });
     await expect(logoutBtn).toBeVisible({ timeout: 5_000 });
     await logoutBtn.click();
-    await expect(page).not.toHaveURL(/seeker\/dashboard/, { timeout: 8_000 });
+    // After logout the seeker layout calls router.replace('/login?next=/seeker/dashboard').
+    // The full URL still contains "seeker/dashboard" as a query param, so check for /login instead.
+    await expect(page).toHaveURL(/\/login/, { timeout: 8_000 });
   });
 });
 

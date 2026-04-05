@@ -15,9 +15,9 @@ export default defineConfig({
 
   use: {
     baseURL: process.env['BASE_URL'] ?? 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    trace: process.env['RECORD_VIDEO'] ? 'on' : 'on-first-retry',
+    screenshot: process.env['RECORD_VIDEO'] ? 'on' : 'only-on-failure',
+    video: process.env['RECORD_VIDEO'] ? 'on' : 'retain-on-failure',
   },
 
   projects: [

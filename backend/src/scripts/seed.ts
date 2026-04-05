@@ -110,6 +110,8 @@ async function seed() {
       location: 'San Francisco, CA',
       skills: ['React', 'Node.js', 'TypeScript', 'PostgreSQL', 'Docker'],
       experienceLevel: 'mid',
+      resumeUrl: 'https://example.com/emma-resume.pdf',
+      resumeFileName: 'emma-resume.pdf',
     },
     {
       userId: seeker2._id,

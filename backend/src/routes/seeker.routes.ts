@@ -37,6 +37,7 @@ router.put('/profile', validate(updateProfileSchema), seekerController.updatePro
 // File uploads — rate limited
 router.post('/avatar', uploadLimiter, uploadAvatar, seekerController.uploadAvatar);
 router.post('/resume', uploadLimiter, uploadResume, seekerController.uploadResume);
+router.delete('/resume', seekerController.deleteResume);
 
 // Saved jobs — ObjectId validated on mutation routes
 router.get('/saved-jobs', validateQuery(paginationQuerySchema), seekerController.getSavedJobs);

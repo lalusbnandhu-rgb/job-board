@@ -26,6 +26,8 @@ export const seekerApi = {
     });
   },
 
+  deleteResume: (): Promise<void> => api.delete('/seeker/resume'),
+
   // Saved jobs
   getSavedJobs: (page = 1, limit = 10): Promise<{ data: SavedJobsResponse }> =>
     api.get('/seeker/saved-jobs', { params: { page, limit } }),

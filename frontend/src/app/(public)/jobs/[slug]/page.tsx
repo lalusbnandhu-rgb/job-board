@@ -13,6 +13,8 @@ import {
   ExternalLink,
   Eye,
   CheckCircle2,
+  Bookmark,
+  BookmarkCheck,
 } from 'lucide-react';
 import { useJob } from '@/hooks/use-jobs';
 import { JobTypeBadge, JobExperienceBadge } from '@/components/jobs/job-type-badge';
@@ -24,6 +26,7 @@ import { formatDate, formatDistanceToNow } from '@/lib/date-utils';
 import { useAuthStore } from '@/store/auth.store';
 import { useCheckApplied } from '@/hooks/use-applications';
 import { ApplyModal } from '@/components/jobs/apply-modal';
+import { useProfile, useSaveJob, useUnsaveJob } from '@/hooks/use-seeker';
 
 interface JobDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -39,6 +42,25 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   const isSeeker = user?.role === 'seeker';
   // Only check applied status for seekers once the job has loaded
   const { data: alreadyApplied } = useCheckApplied(isSeeker ? (job?._id ?? '') : '');
+  const { data: profile } = useProfile();
+  const saveJob = useSaveJob();
+  const unsaveJob = useUnsaveJob();
+
+  // null = not yet toggled by user; derive from profile
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const isSaved = toggled !== null
+    ? toggled
+    : isSeeker && !!job && (profile?.savedJobs ?? []).includes(job._id);
+
+  const handleSaveToggle = () => {
+    if (!job) return;
+    setToggled(!isSaved);
+    if (isSaved) {
+      unsaveJob.mutate(job._id, { onError: () => setToggled(true) });
+    } else {
+      saveJob.mutate(job._id, { onError: () => setToggled(false) });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -181,20 +203,39 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             {/* Apply CTA */}
             <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm sticky top-6">
               {isSeeker ? (
-                alreadyApplied ? (
-                  <div className="flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Already applied
-                  </div>
-                ) : (
+                <div className="space-y-3">
+                  {alreadyApplied ? (
+                    <div className="flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Already applied
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      onClick={() => setApplyOpen(true)}
+                    >
+                      Apply now
+                    </Button>
+                  )}
                   <Button
+                    variant="outline"
                     className="w-full"
-                    size="lg"
-                    onClick={() => setApplyOpen(true)}
+                    onClick={handleSaveToggle}
                   >
-                    Apply now
+                    {isSaved ? (
+                      <>
+                        <BookmarkCheck className="h-4 w-4 text-blue-600" />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="h-4 w-4" />
+                        Save job
+                      </>
+                    )}
                   </Button>
-                )
+                </div>
               ) : user ? (
                 <p className="text-center text-sm text-gray-500">
                   Only job seekers can apply.

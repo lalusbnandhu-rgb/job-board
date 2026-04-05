@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { seekerApi } from '@/lib/seeker-api';
+import type { SeekerProfile } from '@/types/seeker';
 
 export const seekerKeys = {
   profile: ['seeker', 'profile'] as const,
@@ -37,6 +38,14 @@ export const useUploadResume = () => {
   });
 };
 
+export const useDeleteResume = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => seekerApi.deleteResume(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: seekerKeys.profile }),
+  });
+};
+
 export const useSavedJobs = (page = 1) =>
   useQuery({
     queryKey: seekerKeys.savedJobs(page),
@@ -48,7 +57,21 @@ export const useSaveJob = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => seekerApi.saveJob(jobId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['seeker', 'saved-jobs'] }),
+    onMutate: async (jobId) => {
+      await qc.cancelQueries({ queryKey: seekerKeys.profile });
+      const previous = qc.getQueryData<SeekerProfile | null>(seekerKeys.profile);
+      qc.setQueryData<SeekerProfile | null>(seekerKeys.profile, (old) =>
+        old ? { ...old, savedJobs: [...(old.savedJobs ?? []), jobId] } : old,
+      );
+      return { previous };
+    },
+    onError: (_err, _jobId, ctx) => {
+      qc.setQueryData(seekerKeys.profile, ctx?.previous);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: seekerKeys.profile });
+      qc.invalidateQueries({ queryKey: ['seeker', 'saved-jobs'] });
+    },
   });
 };
 
@@ -56,6 +79,20 @@ export const useUnsaveJob = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => seekerApi.unsaveJob(jobId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['seeker', 'saved-jobs'] }),
+    onMutate: async (jobId) => {
+      await qc.cancelQueries({ queryKey: seekerKeys.profile });
+      const previous = qc.getQueryData<SeekerProfile | null>(seekerKeys.profile);
+      qc.setQueryData<SeekerProfile | null>(seekerKeys.profile, (old) =>
+        old ? { ...old, savedJobs: (old.savedJobs ?? []).filter((id) => id !== jobId) } : old,
+      );
+      return { previous };
+    },
+    onError: (_err, _jobId, ctx) => {
+      qc.setQueryData(seekerKeys.profile, ctx?.previous);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: seekerKeys.profile });
+      qc.invalidateQueries({ queryKey: ['seeker', 'saved-jobs'] });
+    },
   });
 };
